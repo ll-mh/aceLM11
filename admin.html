@@ -20,11 +20,12 @@
     .msg-time {color:#888;font-size:13px}
     .msg-content {margin-top:4px;line-height:1.5}
     #loginBox,#panel {display:none}
+    #tip {color:#aaa;margin:10px 0;}
   </style>
 </head>
 <body>
   <h1>网站留言后台</h1>
-  <div id="tip" style="color:#aaa;margin:8px 0;"></div>
+  <div id="tip"></div>
 
   <div class="card" id="loginBox">
     <h2>管理员登录</h2>
@@ -45,12 +46,14 @@
   </div>
 
 <script>
-// ============ 填入你的信息 ============
+// ============ 你的配置 ============
 const SUPABASE_URL = "https://ygovrgozpjbbteigdpxq.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnb3ZyZ296cGpiYnRlaWdkcHhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzc4NjMsImV4cCI6MjEwNTc1Mzg2M30.nyAF5WvXaY8LtgB9MdXYOxfbyAvZuwUzpDVQBlE_K8k";
 const TABLE_NAME = "messages";
-// ======================================
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ==================================
+// 用 supabaseLib.createClient，不再冲突
+const supabaseLib = window.supabase;
+const sb = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const loginBox = document.getElementById('loginBox');
 const panel = document.getElementById('panel');
@@ -60,7 +63,7 @@ const tip = document.getElementById('tip');
 async function init() {
   try{
     tip.innerText = "正在检查登录状态...";
-    const {data:{session}} = await supabase.auth.getSession();
+    const {data:{session}} = await sb.auth.getSession();
     if(session) {
       showPanel();
       loadMsgs();
@@ -69,7 +72,7 @@ async function init() {
       tip.innerText = "请登录管理员账号";
     }
   }catch(e){
-    tip.innerText = "初始化失败："+e.message;
+    tip.innerText = "初始化失败：" + e.message;
     loginBox.style.display = "block";
   }
 }
@@ -84,7 +87,7 @@ async function login(){
   const email = document.getElementById('email').value.trim();
   const pwd = document.getElementById('pwd').value.trim();
   tip.innerText="登录中...";
-  const {error} = await supabase.auth.signInWithPassword({email,pwd});
+  const {error} = await sb.auth.signInWithPassword({email,pwd});
   if(error) {
     tip.innerText = "登录失败："+error.message;
     return;
@@ -94,7 +97,7 @@ async function login(){
 }
 
 async function logout(){
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   loginBox.style.display="block";
   panel.style.display="none";
   msgWrap.innerHTML="";
@@ -103,7 +106,7 @@ async function logout(){
 
 async function loadMsgs(){
   msgWrap.innerHTML="加载中...";
-  const {data,error} = await supabase
+  const {data,error} = await sb
     .from(TABLE_NAME)
     .select("*")
     .order("created_at", {ascending:false});
@@ -128,7 +131,7 @@ async function loadMsgs(){
 
 window.del = async function(id){
   if(!confirm("确定删除这条留言？")) return;
-  const {error} = await supabase.from(TABLE_NAME).delete().eq("id", id);
+  const {error} = await sb.from(TABLE_NAME).delete().eq("id", id);
   if(error) {
     alert("删除失败："+error.message);
     return;
@@ -136,8 +139,7 @@ window.del = async function(id){
   loadMsgs();
 }
 
-// 页面加载完成后运行初始化
-window.onload = init;
+init();
 </script>
 </body>
 </html>
