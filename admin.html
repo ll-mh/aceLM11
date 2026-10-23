@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>站点留言后台</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {box-sizing: border-box;font-family: system-ui, sans-serif;margin:0;padding:0}
+    body {background:#111;color:#eee;padding:24px;max-width:1100px;margin:0 auto}
+    .card {background:#1b1b1b;padding:20px;border-radius:12px;margin-bottom:16px;border:1px solid #333}
+    h1,h2 {margin-bottom:16px}
+    input {width:100%;padding:10px;margin:8px 0;border-radius:6px;border:none;outline:none}
+    button {padding:9px 16px;border:none;border-radius:6px;cursor:pointer;margin:4px;background:#2563eb;color:white}
+    button.del {background:#dc2626}
+    button:hover {opacity:0.9}
+    .msg-item {padding:12px;border-bottom:1px solid #2a2a2a;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .msg-info {flex:1}
+    .msg-nick {color:#60a5fa;font-weight:bold}
+    .msg-time {color:#888;font-size:13px}
+    .msg-content {margin-top:4px;line-height:1.5}
+    #loginBox,#panel {display:none}
+  </style>
+</head>
+<body>
+  <h1>网站留言后台</h1>
+  <div id="tip" style="color:#aaa;margin:8px 0;"></div>
+
+  <div class="card" id="loginBox">
+    <h2>管理员登录</h2>
+    <input type="email" id="email" placeholder="管理员邮箱">
+    <input type="password" id="pwd" placeholder="密码">
+    <button onclick="login()">登录</button>
+  </div>
+
+  <div id="panel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>留言列表</h2>
+        <button onclick="logout()">退出登录</button>
+      </div>
+      <button onclick="loadMsgs()">刷新留言</button>
+      <div id="msgWrap"></div>
+    </div>
+  </div>
+
+<script>
+// ============ 填入你的信息 ============
+const SUPABASE_URL = "https://ygovrgozpjbbteigdpxq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnb3ZyZ296cGpiYnRlaWdkcHhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzc4NjMsImV4cCI6MjEwNTc1Mzg2M30.nyAF5WvXaY8LtgB9MdXYOxfbyAvZuwUzpDVQBlE_K8k";
+const TABLE_NAME = "messages";
+// ======================================
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const loginBox = document.getElementById('loginBox');
+const panel = document.getElementById('panel');
+const msgWrap = document.getElementById('msgWrap');
+const tip = document.getElementById('tip');
+
+async function init() {
+  try{
+    tip.innerText = "正在检查登录状态...";
+    const {data:{session}} = await supabase.auth.getSession();
+    if(session) {
+      showPanel();
+      loadMsgs();
+    } else {
+      loginBox.style.display = "block";
+      tip.innerText = "请登录管理员账号";
+    }
+  }catch(e){
+    tip.innerText = "初始化失败："+e.message;
+    loginBox.style.display = "block";
+  }
+}
+
+function showPanel(){
+  loginBox.style.display="none";
+  panel.style.display="block";
+  tip.innerText="";
+}
+
+async function login(){
+  const email = document.getElementById('email').value.trim();
+  const pwd = document.getElementById('pwd').value.trim();
+  tip.innerText="登录中...";
+  const {error} = await supabase.auth.signInWithPassword({email,pwd});
+  if(error) {
+    tip.innerText = "登录失败："+error.message;
+    return;
+  }
+  showPanel();
+  loadMsgs();
+}
+
+async function logout(){
+  await supabase.auth.signOut();
+  loginBox.style.display="block";
+  panel.style.display="none";
+  msgWrap.innerHTML="";
+  tip.innerText="已退出登录";
+}
+
+async function loadMsgs(){
+  msgWrap.innerHTML="加载中...";
+  const {data,error} = await supabase
+    .from(TABLE_NAME)
+    .select("*")
+    .order("created_at", {ascending:false});
+  if(error) {
+    msgWrap.innerHTML="读取失败："+error.message;
+    return;
+  }
+  msgWrap.innerHTML="";
+  data.forEach(item=>{
+    const div = document.createElement('div');
+    div.className="msg-item";
+    div.innerHTML=`
+      <div class="msg-info">
+        <div class="msg-nick">${item.nick || "匿名访客"} <span class="msg-time">${item.created_at || ""}</span></div>
+        <div class="msg-content">${item.content}</div>
+      </div>
+      <button class="del" onclick="del('${item.id}')">删除</button>
+    `;
+    msgWrap.appendChild(div);
+  })
+}
+
+window.del = async function(id){
+  if(!confirm("确定删除这条留言？")) return;
+  const {error} = await supabase.from(TABLE_NAME).delete().eq("id", id);
+  if(error) {
+    alert("删除失败："+error.message);
+    return;
+  }
+  loadMsgs();
+}
+
+// 页面加载完成后运行初始化
+window.onload = init;
+</script>
+</body>
+</html>
